@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto bg-slate-900 border border-red-600/40 rounded-2xl shadow-xl p-8 space-y-6 text-center">
+    <h1 class="text-3xl font-semibold text-white">Access Denied</h1>
+    <p class="text-slate-300">Sorry, <span class="font-medium">{{ email or 'your account' }}</span> is not authorized to use this service.</p>
+    <p class="text-sm text-slate-500">Contact an administrator to request access.</p>
+    <div class="flex items-center justify-center space-x-3">
+        <a href="/auth/logout" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md">Switch Account</a>
+        <a href="/auth-required" class="text-sm text-slate-400 hover:text-white">Back</a>
+    </div>
+</div>
+{% endblock %}

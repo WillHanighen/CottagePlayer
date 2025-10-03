@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title or app_name }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            500: '#6366F1',
+                            600: '#4F46E5',
+                            700: '#4338CA'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <div class="min-h-screen" x-data="{ sidebarOpen: false }">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" x-show="sidebarOpen" x-transition.opacity x-on:click="sidebarOpen = false"></div>
+        <aside class="fixed inset-y-0 left-0 w-64 bg-slate-900 border-r border-slate-800 p-6 space-y-6 hidden lg:block">
+            <div class="space-y-2">
+                <div class="text-xl font-semibold text-white">{{ app_name }}</div>
+                <p class="text-xs text-slate-400">Self-hosted media hub</p>
+            </div>
+            {% if user %}
+            <div class="flex items-center space-x-3">
+                {% if user.picture %}
+                <img src="{{ user.picture }}" alt="" class="h-10 w-10 rounded-full border border-slate-700" />
+                {% else %}
+                <div class="h-10 w-10 rounded-full bg-primary-600 flex items-center justify-center text-sm font-semibold text-white">
+                    {{ (user.name or user.email)[0]|upper }}
+                </div>
+                {% endif %}
+                <div>
+                    <div class="text-sm font-medium">{{ user.name or user.email }}</div>
+                    <div class="text-xs text-slate-400 uppercase">{{ user.role }}</div>
+                </div>
+            </div>
+            {% endif %}
+            <nav class="space-y-2">
+                <a href="/" class="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition">Library</a>
+                {% if user and user.role == 'admin' %}
+                <a href="/admin/users" class="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition">User Management</a>
+                {% endif %}
+                {% if user %}
+                <a href="/auth/logout" class="block px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition">Logout</a>
+                {% else %}
+                <a href="/auth-required" class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 transition">Login</a>
+                {% endif %}
+            </nav>
+        </aside>
+
+        <div class="lg:pl-64">
+            <header class="sticky top-0 z-20 bg-slate-950/80 border-b border-slate-900 backdrop-blur">
+                <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <button class="lg:hidden p-2 rounded-lg border border-slate-800 text-slate-400 hover:text-white" x-on:click="sidebarOpen = true">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                        </button>
+                        <div>
+                            <div class="text-xl font-semibold text-white">{{ title or app_name }}</div>
+                            {% if subtitle %}
+                            <p class="text-xs text-slate-400">{{ subtitle }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if user %}
+                    <div class="hidden lg:flex items-center space-x-3 text-sm text-slate-400">
+                        <span>{{ user.email }}</span>
+                        <span class="inline-flex items-center rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-200 uppercase">{{ user.role }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </header>
+
+            <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+</body>
+</html>

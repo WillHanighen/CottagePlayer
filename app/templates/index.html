@@ -1,0 +1,473 @@
+{% extends "base.html" %}
+{% block content %}
+<div x-data="appState($el.dataset.appState)" x-init="init()"
+    data-app-state='{{ {"media": media_items, "canUpload": can_upload, "isAdmin": is_admin} | tojson | safe }}'
+    class="space-y-8">
+    <section class="border border-slate-800 rounded-2xl bg-slate-900 p-6 space-y-4">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="flex items-center gap-3">
+                <input type="search" placeholder="Search media..." x-model="query"
+                    class="rounded-lg border-slate-800 bg-slate-950 text-slate-100 focus:border-primary-600 focus:ring-primary-600"
+                    x-on:input="applyFilters()" />
+                <select x-model="sortOrder"
+                    class="rounded-lg border-slate-800 bg-slate-950 text-slate-100 focus:border-primary-600 focus:ring-primary-600 text-sm"
+                    x-on:change="applyFilters()">
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="name">Name (A-Z)</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-3">
+                <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+                    <input type="checkbox" x-model="filters.images"
+                        class="rounded border-slate-700 bg-slate-900 text-primary-600"
+                        x-on:change="applyFilters()" />
+                    Images
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+                    <input type="checkbox" x-model="filters.videos"
+                        class="rounded border-slate-700 bg-slate-900 text-primary-600"
+                        x-on:change="applyFilters()" />
+                    Videos
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+                    <input type="checkbox" x-model="filters.audio"
+                        class="rounded border-slate-700 bg-slate-900 text-primary-600"
+                        x-on:change="applyFilters()" />
+                    Audio
+                </label>
+            </div>
+        </div>
+        <template x-if="canUpload">
+            <form x-on:submit.prevent="upload" class="grid gap-4 md:grid-cols-4 md:items-end border border-slate-800 rounded-2xl bg-slate-950 p-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-slate-300">Title (optional)</label>
+                    <input type="text" x-model="newMedia.title"
+                        class="mt-1 block w-full rounded-lg border-slate-800 bg-slate-900 text-slate-100 focus:border-primary-600 focus:ring-primary-600"
+                        placeholder="A short description" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300">Tags (comma separated)</label>
+                    <input type="text" x-model="newMedia.tags"
+                        class="mt-1 block w-full rounded-lg border-slate-800 bg-slate-900 text-slate-100 focus:border-primary-600 focus:ring-primary-600"
+                        placeholder="vacation, event" />
+                </div>
+                <div class="md:col-span-4 flex flex-wrap items-center gap-4">
+                    <label class="inline-flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-300 hover:border-primary-600">
+                        <input type="file" class="hidden" x-ref="fileInput" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            class="mr-2 h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4" /></svg>
+                        Select media file
+                    </label>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                        x-bind:disabled="loading">Upload</button>
+                    <p class="text-sm text-slate-400" x-text="status"></p>
+                </div>
+            </form>
+        </template>
+    </section>
+
+    <section class="space-y-6">
+        <template x-if="filteredMedia.length === 0">
+            <div class="border border-dashed border-slate-800 rounded-2xl bg-slate-900 p-10 text-center text-slate-400">
+                No media matching your filters yet.
+            </div>
+        </template>
+        <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3" x-show="filteredMedia.length > 0">
+            <template x-for="item in filteredMedia" :key="item.filename">
+                <div class="border border-slate-800 rounded-2xl bg-slate-900 overflow-hidden shadow-lg cursor-pointer hover:border-primary-500"
+                    x-on:click="openViewer(item)">
+                    <div class="relative h-48 bg-slate-950">
+                        <template x-if="item.thumbnail">
+                            <img :src="item.thumbnail" alt="" class="h-full w-full object-cover" />
+                        </template>
+                        <template x-if="!item.thumbnail && item.media_type.startsWith('audio/')">
+                            <div class="flex h-full w-full items-center justify-center text-slate-500">
+                                Audio file
+                            </div>
+                        </template>
+                    </div>
+                    <div class="p-4 border-t border-slate-800 space-y-1">
+                        <h3 class="text-lg font-medium text-white" x-text="item.title || item.filename"></h3>
+                        <p class="text-xs text-slate-500" x-text="item.media_type"></p>
+                        <div class="flex flex-wrap gap-2 text-xs text-primary-400" x-show="item.tags && item.tags.length">
+                            <template x-for="tag in item.tags" :key="tag">
+                                <span class="inline-flex items-center gap-1 bg-primary-600/20 rounded-full px-2 py-1" x-text="tag"></span>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-slate-800 space-y-1">
+                        <button x-show="canUpload"
+                            class="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
+                            x-on:click.stop="deleteMedia(item)">Delete</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </section>
+
+    <div x-show="viewer.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur"
+        x-on:click.self="closeViewer"
+        x-on:keydown.escape.window="closeViewer">
+        <div class="relative w-[95vw] h-[95vh] max-w-6xl max-h-[95vh] rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl flex flex-col">
+            <button class="absolute right-4 top-4 text-slate-400 hover:text-white" x-on:click="closeViewer">✕</button>
+            <div class="p-6 space-y-4 flex-1 flex flex-col overflow-hidden">
+                <h2 class="text-xl font-semibold text-white" x-text="viewer.item?.title || viewer.item?.filename"></h2>
+                <div class="flex-1 flex items-center justify-center overflow-hidden">
+                    <template x-if="viewer.item && viewer.item.media_type.startsWith('video/')">
+                        <video controls class="max-h-full max-w-full rounded-lg" :src="viewer.item.url"></video>
+                    </template>
+                    <template x-if="viewer.item && viewer.item.media_type.startsWith('image/')">
+                        <img :src="viewer.item.url" alt="" class="max-h-full max-w-full rounded-lg object-contain" />
+                    </template>
+                    <template x-if="viewer.item && viewer.item.media_type.startsWith('audio/')">
+                        <div class="w-full space-y-4">
+                            <div class="flex items-center justify-end gap-2 text-xs text-slate-400">
+                                <span>Mode:</span>
+                                <button class="rounded border border-slate-700 px-2 py-1" :class="visualizerMode === 'waveform' ? 'bg-primary-600 text-white' : ''" x-on:click="visualizerMode = 'waveform'; resetVisualizer()">Waveform</button>
+                                <button class="rounded border border-slate-700 px-2 py-1" :class="visualizerMode === 'bars' ? 'bg-primary-600 text-white' : ''" x-on:click="visualizerMode = 'bars'; resetVisualizer()">Bars</button>
+                                <button class="rounded border border-slate-700 px-2 py-1" :class="visualizerMode === 'circle' ? 'bg-primary-600 text-white' : ''" x-on:click="visualizerMode = 'circle'; resetVisualizer()">Pulse</button>
+                            </div>
+                            <div class="h-72 rounded-lg border border-slate-800 bg-slate-950 flex items-center justify-center text-slate-500 relative overflow-hidden">
+                                <div class="absolute inset-0 flex items-center justify-center" x-show="!showVisualizer">
+                                </div>
+                                <canvas x-ref="canvas" class="w-full h-full"></canvas>
+                            </div>
+                            <audio controls class="w-full" :src="viewer.item.url" x-ref="audio" x-on:play="startVisualizer" x-on:pause="stopVisualizer" x-on:ended="stopVisualizer"></audio>
+                        </div>
+                    </template>
+                </div>
+                <template x-if="viewer.item && viewer.item.media_type.startsWith('audio/')">
+                    <div class="space-y-4">
+                        <!-- audio content handled above -->
+                    </div>
+                </template>
+                <p class="text-sm text-slate-400" x-text="viewer.item?.description"></p>
+                <div class="flex flex-wrap gap-2 text-xs text-primary-400" x-show="viewer.item && viewer.item.tags && viewer.item.tags.length">
+                    <template x-if="viewer.item && viewer.item.tags">
+                        <template x-for="tag in viewer.item.tags" :key="tag">
+                            <span class="inline-flex items-center gap-1 bg-primary-600/20 rounded-full px-2 py-1" x-text="tag"></span>
+                        </template>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function appState(stateJson) {
+        const initial = JSON.parse(stateJson)
+        const initialMedia = initial.media || []
+        const canUpload = Boolean(initial.canUpload)
+        const isAdmin = Boolean(initial.isAdmin)
+
+        return {
+            allMedia: initialMedia,
+            filteredMedia: initialMedia,
+            query: '',
+            sortOrder: 'newest',
+            filters: { images: true, videos: true, audio: true },
+            canUpload,
+            isAdmin,
+            newMedia: { title: '', tags: '' },
+            loading: false,
+            status: '',
+            viewer: { open: false, item: null },
+            showVisualizer: false,
+            audioContext: null,
+            analyser: null,
+            dataArray: null,
+            waveformArray: null,
+            rafId: null,
+            visualizerMode: 'waveform',
+            source: null,
+            mediaElement: null,
+            analyserConnected: false,
+            audioContextPromise: null,
+            visualizerInitializing: false,
+            visualizerHue: 0,
+            init() {
+                this.applyFilters()
+            },
+            applyFilters() {
+                const q = this.query.toLowerCase()
+                this.filteredMedia = this.allMedia
+                    .filter(item => {
+                        const matchesQuery = [item.filename, item.title, item.description, ...(item.tags || [])]
+                            .filter(Boolean)
+                            .some(value => value.toLowerCase().includes(q))
+                        const type = item.media_type
+                        const matchesType = (this.filters.images && type.startsWith('image/'))
+                            || (this.filters.videos && type.startsWith('video/'))
+                            || (this.filters.audio && type.startsWith('audio/'))
+                        return matchesQuery && matchesType
+                    })
+                    .sort((a, b) => {
+                        if (this.sortOrder === 'name') {
+                            return a.filename.localeCompare(b.filename)
+                        }
+                        if (this.sortOrder === 'oldest') {
+                            return (a.uploaded_at || 0) - (b.uploaded_at || 0)
+                        }
+                        if (this.sortOrder === 'newest') {
+                            return (b.uploaded_at || 0) - (a.uploaded_at || 0)
+                        }
+                        return 0
+                    })
+            },
+            openViewer(item) {
+                this.viewer = { open: true, item }
+            },
+            closeViewer() {
+                this.teardownVisualizer()
+                this.viewer = { open: false, item: null }
+            },
+            async upload() {
+                const fileInput = this.$refs.fileInput
+                if (!fileInput.files[0]) {
+                    this.status = 'Please select a file first.'
+                    return
+                }
+                this.loading = true
+                this.status = ''
+                const formData = new FormData()
+                formData.append('file', fileInput.files[0])
+                if (this.newMedia.title) formData.append('title', this.newMedia.title)
+                if (this.newMedia.tags) formData.append('tags', this.newMedia.tags)
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    if (!response.ok) {
+                        throw new Error('Upload failed')
+                    }
+                    const data = await response.json()
+                    const item = data.media_item
+                    item.uploaded_at = Date.now()
+                    if (this.newMedia.tags) {
+                        item.tags = this.newMedia.tags.split(',').map(t => t.trim()).filter(Boolean)
+                    }
+                    if (this.newMedia.title) {
+                        item.title = this.newMedia.title
+                    }
+                    this.allMedia.unshift(item)
+                    this.applyFilters()
+                    this.newMedia.title = ''
+                    this.newMedia.tags = ''
+                    fileInput.value = null
+                    this.status = 'Upload successful!'
+                } catch (error) {
+                    console.error(error)
+                    this.status = 'Error uploading file.'
+                } finally {
+                    this.loading = false
+                }
+            },
+            async deleteMedia(item) {
+                if (!confirm('Are you sure you want to delete this media item?')) {
+                    return
+                }
+                this.loading = true
+                this.status = ''
+                try {
+                    const response = await fetch(`/media/${encodeURIComponent(item.filename)}`, {
+                        method: 'DELETE'
+                    })
+                    if (!response.ok) {
+                        throw new Error('Deletion failed')
+                    }
+                    const data = await response.json()
+                    this.allMedia = this.allMedia.filter(media => media.filename !== item.filename)
+                    this.applyFilters()
+                    this.status = 'Media item deleted.'
+                } catch (error) {
+                    console.error(error)
+                    this.status = 'Error deleting media item.'
+                } finally {
+                    this.loading = false
+                }
+            },
+            startVisualizer() {
+                if (!this.viewer.item || !this.viewer.item.media_type.startsWith('audio/')) return
+                const AudioContextCtor = window.AudioContext || window.webkitAudioContext
+                if (!AudioContextCtor) {
+                    console.warn('Web Audio API not supported in this browser')
+                    return
+                }
+                const ensureContext = () => {
+                    if (this.audioContext) {
+                        return Promise.resolve(this.audioContext)
+                    }
+                    if (!this.audioContextPromise) {
+                        this.audioContextPromise = new Promise((resolve, reject) => {
+                            try {
+                                const ctx = new AudioContextCtor()
+                                resolve(ctx)
+                            } catch (err) {
+                                reject(err)
+                            }
+                        }).then(ctx => {
+                            this.audioContext = ctx
+                            this.audioContextPromise = null
+                            return ctx
+                        }).catch(err => {
+                            console.error('Unable to create AudioContext', err)
+                            this.audioContext = null
+                            this.audioContextPromise = null
+                            throw err
+                        })
+                    }
+                    return this.audioContextPromise
+                }
+                ensureContext().then(ctx => {
+                    if (this.visualizerInitializing) return
+                    this.visualizerInitializing = true
+                    if (!ctx) {
+                        this.visualizerInitializing = false
+                        return
+                    }
+                    if (!this.analyser) {
+                        this.analyser = ctx.createAnalyser()
+                        this.analyser.fftSize = 1024
+                        this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
+                    }
+                    const audio = this.$refs.audio
+                    if (!audio) {
+                        this.visualizerInitializing = false
+                        return
+                    }
+                    if (this.mediaElement !== audio) {
+                        if (this.source) {
+                            try {
+                                this.source.disconnect()
+                            } catch (error) {
+                                console.warn('Error disconnecting old source', error)
+                            }
+                        }
+                        this.source = ctx.createMediaElementSource(audio)
+                        this.mediaElement = audio
+                        this.source.connect(this.analyser)
+                        this.analyser.connect(ctx.destination)
+                        this.analyserConnected = true
+                    }
+                    if (ctx.state === 'suspended') {
+                        ctx.resume().catch(() => {
+                            this.visualizerInitializing = false
+                        })
+                    }
+                    if (!this.dataArray || this.dataArray.length !== this.analyser.frequencyBinCount) {
+                        this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
+                    }
+                    this.showVisualizer = true
+                    this.drawVisualizer()
+                    this.visualizerInitializing = false
+                }).catch(() => {
+                    this.showVisualizer = false
+                    this.visualizerInitializing = false
+                })
+            },
+            stopVisualizer() {
+                this.showVisualizer = false
+                cancelAnimationFrame(this.rafId)
+            },
+            teardownVisualizer() {
+                this.stopVisualizer()
+                if (this.source) {
+                    try {
+                        this.source.disconnect()
+                    } catch (e) {
+                        console.warn('Error disconnecting source', e)
+                    }
+                    this.source = null
+                }
+                if (this.analyser && this.analyserConnected) {
+                    try {
+                        this.analyser.disconnect()
+                    } catch (e) {
+                        console.warn('Error disconnecting analyser', e)
+                    }
+                    this.analyserConnected = false
+                }
+                this.mediaElement = null
+                this.analyser = null
+                this.dataArray = null
+                // Keep audioContext alive for scrubbing; suspend if running
+                if (this.audioContext && this.audioContext.state === 'running') {
+                    this.audioContext.suspend().catch(() => {})
+                }
+            },
+            resetVisualizer() {
+                this.stopVisualizer()
+                if (this.$refs.audio && !this.$refs.audio.paused) {
+                    this.startVisualizer()
+                }
+            },
+            drawVisualizer() {
+                if (!this.showVisualizer) return
+                this.analyser.getByteFrequencyData(this.dataArray)
+                const canvas = this.$refs.canvas
+                if (!canvas) return
+                const ctx = canvas.getContext('2d')
+                const width = canvas.width = canvas.offsetWidth
+                const height = canvas.height = canvas.offsetHeight
+                ctx.clearRect(0, 0, width, height)
+
+                this.visualizerHue = (this.visualizerHue + 1.5) % 360
+                const baseHue = this.visualizerHue
+
+                if (this.visualizerMode === 'waveform') {
+                    const waveform = new Uint8Array(this.analyser.fftSize)
+                    this.analyser.getByteTimeDomainData(waveform)
+                    const gradient = ctx.createLinearGradient(0, 0, width, height)
+                    gradient.addColorStop(0, `hsl(${baseHue}, 80%, 60%)`)
+                    gradient.addColorStop(1, `hsl(${(baseHue + 60) % 360}, 80%, 60%)`)
+                    ctx.strokeStyle = gradient
+                    ctx.lineWidth = 2
+                    ctx.beginPath()
+                    const sliceWidth = width / waveform.length
+                    let x = 0
+                    for (let i = 0; i < waveform.length; i++) {
+                        const v = waveform[i] / 128.0
+                        const y = v * height / 2
+                        if (i === 0) ctx.moveTo(x, y)
+                        else ctx.lineTo(x, y)
+                        x += sliceWidth
+                    }
+                    ctx.stroke()
+                } else if (this.visualizerMode === 'circle') {
+                    const radius = Math.min(width, height) / 4
+                    const centerX = width / 2
+                    const centerY = height / 2
+                    for (let i = 0; i < this.dataArray.length; i++) {
+                        const angle = (i / this.dataArray.length) * Math.PI * 2
+                        const barHeight = this.dataArray[i] / 255 * radius
+                        const x = centerX + Math.cos(angle) * radius
+                        const y = centerY + Math.sin(angle) * radius
+                        const xEnd = centerX + Math.cos(angle) * (radius + barHeight)
+                        const yEnd = centerY + Math.sin(angle) * (radius + barHeight)
+                        ctx.strokeStyle = `hsl(${(baseHue + (i / this.dataArray.length) * 180) % 360}, 80%, 60%)`
+                        ctx.lineWidth = 2
+                        ctx.beginPath()
+                        ctx.moveTo(x, y)
+                        ctx.lineTo(xEnd, yEnd)
+                        ctx.stroke()
+                    }
+                } else {
+                    const barWidth = (width / this.dataArray.length) * 2
+                    let x = 0
+                    for (let i = 0; i < this.dataArray.length; i++) {
+                        const barHeight = this.dataArray[i] / 255 * height
+                        ctx.fillStyle = `hsl(${(baseHue + (i / this.dataArray.length) * 120) % 360}, 80%, 60%)`
+                        ctx.fillRect(x, height - barHeight, barWidth, barHeight)
+                        x += barWidth + 1
+                    }
+                }
+
+                this.rafId = requestAnimationFrame(() => this.drawVisualizer())
+            }
+        }
+    }
+</script>
+{% endblock %}

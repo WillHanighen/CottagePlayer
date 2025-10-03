@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-xl p-8 space-y-6 text-center">
+    <h1 class="text-3xl font-semibold text-white">{{ app_name }}</h1>
+    <p class="text-slate-400">You need to sign in with an authorized Google account to access this service.</p>
+    <a href="/auth/login" class="inline-flex items-center justify-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition">Sign in with Google</a>
+</div>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6">
+    <section class="border border-slate-800 rounded-2xl bg-slate-900 p-6">
+        <h2 class="text-lg font-semibold text-white mb-4">Add Authorized User</h2>
+        <form method="post" action="/admin/users" class="grid gap-4 md:grid-cols-4 md:items-end">
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-slate-300">Email</label>
+                <input type="email" name="email" required class="mt-1 block w-full rounded-lg border-slate-800 bg-slate-950 text-slate-100 focus:border-primary-600 focus:ring-primary-600" placeholder="user@example.com" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300">Name (optional)</label>
+                <input type="text" name="name" class="mt-1 block w-full rounded-lg border-slate-800 bg-slate-950 text-slate-100 focus:border-primary-600 focus:ring-primary-600" placeholder="Display name" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300">Role</label>
+                <select name="role" class="mt-1 block w-full rounded-lg border-slate-800 bg-slate-950 text-slate-100 focus:border-primary-600 focus:ring-primary-600">
+                    <option value="viewer">Viewer</option>
+                    <option value="uploader">Uploader</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div class="md:col-span-4 flex justify-end">
+                <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">Add User</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="border border-slate-800 rounded-2xl bg-slate-900 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-800 text-sm">
+                <thead class="bg-slate-950/60 text-slate-400 uppercase text-xs">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium">Email</th>
+                        <th class="px-4 py-3 text-left font-medium">Name</th>
+                        <th class="px-4 py-3 text-left font-medium">Role</th>
+                        <th class="px-4 py-3 text-left font-medium">Active</th>
+                        <th class="px-4 py-3 text-left font-medium">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for entry in users %}
+                    <tr class="hover:bg-slate-800/40">
+                        <td class="px-4 py-3 text-slate-200">{{ entry.email }}</td>
+                        <td class="px-4 py-3 text-slate-400">{{ entry.name or '-' }}</td>
+                        <td class="px-4 py-3">
+                            <form method="post" action="/admin/users/{{ entry.id }}/role" class="inline-flex items-center space-x-2">
+                                <select name="role" class="rounded border-slate-700 bg-slate-950 text-slate-100 text-sm" {% if entry.email == user.email %}disabled{% endif %}>
+                                    {% for role in roles %}
+                                    <option value="{{ role }}" {% if entry.role.value == role %}selected{% endif %}>{{ role | capitalize }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="px-3 py-1 text-xs bg-primary-600 text-white rounded" {% if entry.email == user.email %}disabled{% endif %}>Update</button>
+                            </form>
+                        </td>
+                        <td class="px-4 py-3">
+                            <form method="post" action="/admin/users/{{ entry.id }}/active" class="inline-flex items-center space-x-2">
+                                <span class="text-sm {% if entry.active %}text-green-400{% else %}text-red-400{% endif %}">
+                                    {{ 'Active' if entry.active else 'Disabled' }}
+                                </span>
+                                {% if entry.email != user.email %}
+                                <button type="submit" name="active" value="{% if entry.active %}false{% else %}true{% endif %}" class="px-3 py-1 text-xs bg-slate-800 text-white rounded">
+                                    {% if entry.active %}Disable{% else %}Enable{% endif %}
+                                </button>
+                                {% endif %}
+                            </form>
+                        </td>
+                        <td class="px-4 py-3 text-xs text-slate-500">
+                            ID: {{ entry.id }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
