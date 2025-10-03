@@ -437,18 +437,31 @@
                     }
                     ctx.stroke()
                 } else if (this.visualizerMode === 'circle') {
-                    const radius = Math.min(width, height) / 4
+                    const radiusBase = Math.min(width, height) / 4
+                    const bassCount = Math.max(1, Math.floor(this.dataArray.length * 0.18))
+                    const trebleStart = Math.floor(this.dataArray.length * 0.65)
+                    let bassSum = 0
+                    for (let i = 0; i < bassCount; i++) bassSum += this.dataArray[i]
+                    let trebleSum = 0
+                    for (let i = trebleStart; i < this.dataArray.length; i++) trebleSum += this.dataArray[i]
+                    const bassIntensity = bassSum / (bassCount * 255) || 0
+                    const trebleCount = this.dataArray.length - trebleStart || 1
+                    const trebleIntensity = trebleSum / (trebleCount * 255) || 0
+                    const baseRadius = radiusBase * (0.6 + bassIntensity * 1.2)
                     const centerX = width / 2
                     const centerY = height / 2
                     for (let i = 0; i < this.dataArray.length; i++) {
                         const angle = (i / this.dataArray.length) * Math.PI * 2
-                        const barHeight = this.dataArray[i] / 255 * radius
-                        const x = centerX + Math.cos(angle) * radius
-                        const y = centerY + Math.sin(angle) * radius
-                        const xEnd = centerX + Math.cos(angle) * (radius + barHeight)
-                        const yEnd = centerY + Math.sin(angle) * (radius + barHeight)
+                        const freqFactor = i / this.dataArray.length
+                        const signalStrength = this.dataArray[i] / 255
+                        const dynamicRadius = baseRadius * (0.9 + freqFactor * 0.25)
+                        const lengthBoost = radiusBase * (0.35 + signalStrength * (0.65 + trebleIntensity * 0.5))
+                        const x = centerX + Math.cos(angle) * dynamicRadius
+                        const y = centerY + Math.sin(angle) * dynamicRadius
+                        const xEnd = centerX + Math.cos(angle) * (dynamicRadius + lengthBoost)
+                        const yEnd = centerY + Math.sin(angle) * (dynamicRadius + lengthBoost)
                         ctx.strokeStyle = `hsl(${(baseHue + (i / this.dataArray.length) * 180) % 360}, 80%, 60%)`
-                        ctx.lineWidth = 2
+                        ctx.lineWidth = 1.5 + trebleIntensity * 2 + signalStrength * 1.2
                         ctx.beginPath()
                         ctx.moveTo(x, y)
                         ctx.lineTo(xEnd, yEnd)
