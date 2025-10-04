@@ -18,6 +18,38 @@ class Settings(BaseSettings):
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     initial_admin_emails_raw: str = Field(default="", alias="INITIAL_ADMIN_EMAILS")
     allow_auto_signup: bool = Field(default=False, alias="ALLOW_AUTO_SIGNUP")
+    tag_options_raw: str = Field(default="", alias="TAG_OPTIONS")
+    playlist_options_raw: str = Field(default="", alias="PLAYLIST_OPTIONS")
+
+    _default_tag_options = [
+        "Music",
+        "Movies",
+        "TV Shows",
+        "Photos",
+        "Podcasts",
+        "Clips"
+    ]
+    _default_playlist_options = [
+        "Favorites",
+        "Music",
+        "Movies",
+        "TV Shows",
+        "Photos & GIFs"
+    ]
+
+    @property
+    def tag_options(self) -> list[str]:
+        if not self.tag_options_raw:
+            return self._default_tag_options.copy()
+        parsed = [tag.strip() for tag in self.tag_options_raw.split(",") if tag.strip()]
+        return parsed or self._default_tag_options.copy()
+
+    @property
+    def playlist_options(self) -> list[str]:
+        if not self.playlist_options_raw:
+            return self._default_playlist_options.copy()
+        parsed = [pl.strip() for pl in self.playlist_options_raw.split(",") if pl.strip()]
+        return parsed or self._default_playlist_options.copy()
 
     @property
     def database_connection_url(self) -> str:

@@ -8,6 +8,9 @@ Self-hosted media upload and playback service built with FastAPI, Alpine.js, Tai
 - Admin UI to review users, toggle activity, and promote/demote roles.
 - Upload and stream audio, video, image, and GIF files.
 - Responsive Alpine.js/Tailwind front-end.
+- Curated library views for music, movies, TV, and photos with tag/playlist filtering.
+- Inline pill selectors for tags and playlists to keep organisation consistent with the sidebar navigation.
+- User-managed playlists (create, rename, describe, add/remove media) for music and other audio collections.
 
 ## Requirements
 
@@ -34,6 +37,8 @@ Self-hosted media upload and playback service built with FastAPI, Alpine.js, Tai
    DATABASE_URL=sqlite:///absolute/path/to/cottageplayer.db  # optional; defaults to MEDIA_ROOT/cottageplayer.db
    INITIAL_ADMIN_EMAILS=admin@example.com,another_admin@example.com
    ALLOW_AUTO_SIGNUP=false
+   TAG_OPTIONS=Music,Movie,TV,Photo,Podcast  # optional; comma-separated list for tag pills
+   PLAYLIST_OPTIONS=Favorites,Music,Movies,TV Shows,Photos  # optional; comma-separated playlist names
    ```
 
 3. Run the application:
@@ -44,6 +49,8 @@ Self-hosted media upload and playback service built with FastAPI, Alpine.js, Tai
 4. Navigate to `http://localhost:8000`:
    - If you're not authenticated you'll be redirected to `/auth-required` with a Google sign-in button.
    - After authenticating with an admin account you can manage users at `/admin/users`.
+   - Use the sidebar to jump to dedicated library views (Music & Playlists, Movies, TV Shows, Photos & GIFs).
+   - Manage playlists via the Music view: create, rename, add/remove items, and delete playlists directly from the UI.
 
 ## Environment Variables
 
@@ -54,11 +61,17 @@ Self-hosted media upload and playback service built with FastAPI, Alpine.js, Tai
 - `DATABASE_URL`: Optional SQLAlchemy database URL (SQLite by default).
 - `INITIAL_ADMIN_EMAILS`: Comma-separated list of emails to seed as admins on startup.
 - `ALLOW_AUTO_SIGNUP`: Defaults to `false`. Set to `true` to automatically provision accounts on first login.
+- `TAG_OPTIONS`: Comma-separated tag catalogue exposed as pill selectors for uploads/filters.
+- `PLAYLIST_OPTIONS`: Comma-separated playlist catalogue exposed as pill selectors for uploads/filters.
+
+## Library organisation
+
+The sidebar links correspond to filtered views on `/library/*`. Filters are pre-populated using the tag and playlist options defined in environment variables. Users with upload privileges can assign tags/playlists using pill selectors on upload or edit; viewers see badge chips on media cards and can browse via the curated sections. Playlists appear alongside filtered media so users can open or edit them quickly.
 
 ## Roles
 
 - `viewer`: Can log in and play media.
-- `uploader`: Viewer privileges plus ability to upload new media.
+- `uploader`: Viewer privileges plus ability to upload new media, assign tags/playlists, and manage personal playlists.
 - `admin`: Full access, including managing users and toggling activity.
 
 ## Notes

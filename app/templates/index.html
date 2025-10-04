@@ -1,7 +1,25 @@
 {% extends "base.html" %}
 {% block content %}
+{% set library_nav = [
+    {"label": "All Media", "href": "/", "category": None},
+    {"label": "Music & Playlists", "href": "/library/music", "category": "music"},
+    {"label": "Movies", "href": "/library/movies", "category": "movies"},
+    {"label": "TV Shows", "href": "/library/tv", "category": "tv"},
+    {"label": "Photos & GIFs", "href": "/library/photos", "category": "photos"}
+] %}
+
+<div class="flex flex-wrap gap-2 text-xs font-medium">
+    {% for nav_item in library_nav %}
+        {% set is_active = (category is defined and category == nav_item.category) or (category is not defined and nav_item.category is none) %}
+        <a href="{{ nav_item.href }}"
+            class="px-3 py-1 rounded-full border transition {{ 'bg-primary-600 text-white border-primary-500' if is_active else 'border-slate-700 text-slate-300 hover:border-primary-600 hover:text-white' }}">
+            {{ nav_item.label }}
+        </a>
+    {% endfor %}
+</div>
+
 <div x-data="appState($el.dataset.appState)" x-init="init()"
-    data-app-state='{{ {"media": media_items, "canUpload": can_upload, "isAdmin": is_admin} | tojson | safe }}'
+    data-app-state='{{ {"media": media_items, "canUpload": can_upload, "isAdmin": is_admin, "role": role, "userId": user_id, "tagOptions": tag_options, "playlistOptions": playlist_options, "initialFilters": initial_filters} | tojson | safe }}'
     class="space-y-8">
     <section class="border border-slate-800 rounded-2xl bg-slate-900 p-6 space-y-4">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -36,21 +54,63 @@
                         x-on:change="applyFilters()" />
                     Audio
                 </label>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-slate-300">Tags</span>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="option in tagOptions" :key="`filter-tag-${option}`">
+                            <button type="button"
+                                class="px-3 py-1 rounded-full border transition text-xs font-medium"
+                                :class="selectedTags.includes(option) ? 'bg-primary-600 text-white border-primary-500' : 'border-slate-700 text-slate-300 hover:border-primary-600 hover:text-white'"
+                                x-on:click="toggleTagFilter(option)"
+                                x-text="option"></button>
+                        </template>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-slate-300">Playlists</span>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="option in playlistOptions" :key="`filter-playlist-${option}`">
+                            <button type="button"
+                                class="px-3 py-1 rounded-full border transition text-xs font-medium"
+                                :class="selectedPlaylists.includes(option) ? 'bg-primary-600 text-white border-primary-500' : 'border-slate-700 text-slate-300 hover:border-primary-600 hover:text-white'"
+                                x-on:click="togglePlaylistFilter(option)"
+                                x-text="option"></button>
+                        </template>
+                    </div>
+                </div>
             </div>
         </div>
         <template x-if="canUpload">
             <form x-on:submit.prevent="upload" class="grid gap-4 md:grid-cols-4 md:items-end border border-slate-800 rounded-2xl bg-slate-950 p-4">
-                <div class="md:col-span-2">
+                <div>
                     <label class="block text-sm font-medium text-slate-300">Title (optional)</label>
                     <input type="text" x-model="newMedia.title"
                         class="mt-1 block w-full rounded-lg border-slate-800 bg-slate-900 text-slate-100 focus:border-primary-600 focus:ring-primary-600"
-                        placeholder="A short description" />
+                        placeholder="A short title" />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-300">Tags (comma separated)</label>
-                    <input type="text" x-model="newMedia.tags"
-                        class="mt-1 block w-full rounded-lg border-slate-800 bg-slate-900 text-slate-100 focus:border-primary-600 focus:ring-primary-600"
-                        placeholder="vacation, event" />
+                    <label class="block text-sm font-medium text-slate-300">Tags</label>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <template x-for="option in tagOptions" :key="`upload-tag-${option}`">
+                            <button type="button"
+                                class="px-3 py-1 rounded-full border transition text-xs font-medium"
+                                :class="newMedia.tags.includes(option) ? 'bg-primary-600 text-white border-primary-500' : 'border-slate-700 text-slate-300 hover:border-primary-600 hover:text-white'"
+                                x-on:click="toggleNewMediaTag(option)"
+                                x-text="option"></button>
+                        </template>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300">Playlists</label>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <template x-for="option in playlistOptions" :key="`upload-playlist-${option}`">
+                            <button type="button"
+                                class="px-3 py-1 rounded-full border transition text-xs font-medium"
+                                :class="newMedia.playlists.includes(option) ? 'bg-primary-600 text-white border-primary-500' : 'border-slate-700 text-slate-300 hover:border-primary-600 hover:text-white'"
+                                x-on:click="toggleNewMediaPlaylist(option)"
+                                x-text="option"></button>
+                        </template>
+                    </div>
                 </div>
                 <div class="md:col-span-4 flex flex-wrap items-center gap-4">
                     <label class="inline-flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-300 hover:border-primary-600">
@@ -65,12 +125,48 @@
                 </div>
             </form>
         </template>
-    </section>
+        </section>
 
-    <section class="space-y-6">
-        <template x-if="filteredMedia.length === 0">
+        <section class="space-y-6">
+        <template x-if="!playlists.length && filteredMedia.length === 0">
             <div class="border border-dashed border-slate-800 rounded-2xl bg-slate-900 p-10 text-center text-slate-400">
-                No media matching your filters yet.
+                No media or playlists matching your filters yet.
+            </div>
+        </template>
+        <template x-if="playlists.length">
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-300">Playlists</h2>
+                    <button class="rounded-full border border-primary-500 px-3 py-1 text-xs font-medium text-primary-200 hover:bg-primary-500/20"
+                        x-on:click.stop="openPlaylistManager()">
+                        New Playlist
+                    </button>
+                </div>
+                <div class="grid gap-4 md:grid-cols-2">
+                    <template x-for="playlist in playlists" :key="playlist.id">
+                        <div class="border border-slate-800 rounded-2xl bg-slate-900 p-4 space-y-3">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-white" x-text="playlist.name"></h3>
+                                    <p class="text-xs text-slate-400" x-text="playlist.description || 'No description'"></p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button class="text-xs text-primary-300 hover:text-primary-100" x-on:click.stop="openPlaylistManager(playlist)">Edit</button>
+                                    <button class="text-xs text-red-300 hover:text-red-200" x-on:click.stop="deletePlaylist(playlist)">Delete</button>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 text-xs text-primary-300">
+                                <template x-for="tag in playlist.tags || []" :key="tag">
+                                    <span class="px-2 py-1 rounded-full border border-primary-600/30 bg-primary-600/20" x-text="tag"></span>
+                                </template>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-slate-400">
+                                <span x-text="(playlist.items || []).length + ' items'"></span>
+                                <button class="text-primary-400 hover:text-primary-200" x-on:click="openPlaylist(playlist)">View Playlist</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
             </div>
         </template>
         <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3" x-show="filteredMedia.length > 0">
@@ -85,7 +181,29 @@
                             <div class="flex h-full w-full items-center justify-center text-slate-500">
                                 Audio file
                             </div>
-                        </template>
+            </template>
+                        <div class="absolute right-2 top-2 flex flex-col gap-2">
+                            <button type="button"
+                                x-show="canEdit"
+                                class="rounded-full bg-black/60 px-3 py-1 text-xs text-slate-200 hover:bg-primary-500/30"
+                                x-on:click.stop="openEditDialog(item)"
+                                title="Edit">
+                                Edit
+                            </button>
+                            <button type="button"
+                                class="rounded-full bg-black/60 px-3 py-1 text-xs text-slate-200 hover:bg-primary-500/30"
+                                x-on:click.stop="downloadMedia(item)"
+                                title="Download">
+                                Download
+                            </button>
+                            <button type="button"
+                                x-show="canDelete"
+                                class="rounded-full bg-black/60 px-3 py-1 text-xs text-red-300 hover:bg-red-500/30"
+                                x-on:click.stop="openDeleteDialog(item)"
+                                title="Delete">
+                                Delete
+                            </button>
+                        </div>
                     </div>
                     <div class="p-4 border-t border-slate-800 space-y-1">
                         <h3 class="text-lg font-medium text-white" x-text="item.title || item.filename"></h3>
@@ -95,11 +213,11 @@
                                 <span class="inline-flex items-center gap-1 bg-primary-600/20 rounded-full px-2 py-1" x-text="tag"></span>
                             </template>
                         </div>
-                    </div>
-                    <div class="p-4 border-t border-slate-800 space-y-1">
-                        <button x-show="canUpload"
-                            class="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
-                            x-on:click.stop="deleteMedia(item)">Delete</button>
+                        <div class="flex flex-wrap gap-2 text-xs text-amber-300" x-show="item.playlists && item.playlists.length">
+                            <template x-for="pl in item.playlists" :key="pl">
+                                <span class="inline-flex items-center gap-1 bg-amber-500/20 rounded-full px-2 py-1" x-text="pl"></span>
+                            </template>
+                        </div>
                     </div>
                 </div>
             </template>
@@ -153,27 +271,158 @@
             </div>
         </div>
     </div>
-</div>
 
-<script>
+    <div x-show="deleteDialog.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+        x-on:click.self="closeDeleteDialog"
+        x-on:keydown.escape.window="closeDeleteDialog">
+        <div class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-6">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-white">Delete Media</h3>
+                <button class="text-slate-400 hover:text-white" x-on:click="closeDeleteDialog">✕</button>
+            </div>
+            <p class="text-sm text-slate-300">
+                Are you sure you want to delete
+                <span class="font-semibold text-white" x-text="deleteDialog.item?.title || deleteDialog.item?.filename"></span>?
+                This action cannot be undone.
+            </p>
+            <div class="rounded-xl bg-slate-950 border border-slate-800 p-4 text-xs text-slate-400 space-y-1">
+                <div class="flex justify-between"><span>Filename:</span><span x-text="deleteDialog.item?.filename"></span></div>
+                <div class="flex justify-between"><span>Type:</span><span x-text="deleteDialog.item?.media_type"></span></div>
+                <template x-if="deleteDialog.item?.uploaded_at">
+                    <div class="flex justify-between"><span>Uploaded:</span><span x-text="formatTimestamp(deleteDialog.item.uploaded_at)"></span></div>
+                </template>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button class="rounded-lg border border-slate-700 px-4 py-2 text-slate-300 hover:bg-slate-800" x-on:click="closeDeleteDialog">Cancel</button>
+                <button class="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-500"
+                    x-bind:disabled="loading"
+                    x-on:click="confirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="playlistManager.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+        x-on:click.self="closePlaylistManager"
+        x-on:keydown.escape.window="closePlaylistManager">
+        <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-6">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-white" x-text="playlistManager.form.id ? 'Edit Playlist' : 'New Playlist'"></h3>
+                <button class="text-slate-400 hover:text-white" x-on:click="closePlaylistManager">✕</button>
+            </div>
+            <form class="space-y-4" x-on:submit.prevent="savePlaylist">
+                <div>
+                    <label class="block text-sm text-slate-300">Name</label>
+                    <input type="text" x-model="playlistManager.form.name"
+                        class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600" />
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-300">Description</label>
+                    <textarea x-model="playlistManager.form.description" rows="3"
+                        class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600"></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" class="rounded-lg border border-slate-700 px-4 py-2 text-slate-300 hover:bg-slate-800" x-on:click="closePlaylistManager">Cancel</button>
+                    <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-white hover:bg-primary-500" x-bind:disabled="loading">Save</button>
+                </div>
+            </form>
+            <template x-if="playlistManager.error">
+                <p class="text-sm text-red-400" x-text="playlistManager.error"></p>
+            </template>
+        </div>
+    </div>
+
+    <div x-show="editDialog.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+        x-on:click.self="closeEditDialog"
+        x-on:keydown.escape.window="closeEditDialog">
+        <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-6">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-white">Edit Media Details</h3>
+                <button class="text-slate-400 hover:text-white" x-on:click="closeEditDialog">✕</button>
+            </div>
+            <form class="space-y-4" x-on:submit.prevent="confirmEdit">
+                <div>
+                    <label class="block text-sm text-slate-300">Title</label>
+                    <input type="text" x-model="editDialog.form.title"
+                        class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600" />
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-300">Description</label>
+                    <textarea x-model="editDialog.form.description" rows="3"
+                        class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-300">Tags</label>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <template x-for="option in tagOptions" :key="`edit-tag-${option}`">
+                            <button type="button"
+                                class="px-3 py-1 rounded-full border transition text-xs font-medium"
+                                :class="editDialog.form.tags.includes(option) ? 'bg-primary-600 text-white border-primary-500' : 'border-slate-700 text-slate-300 hover:border-primary-600 hover:text-white'"
+                                x-on:click="toggleEditTag(option)"
+                                x-text="option"></button>
+                        </template>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-300">Playlists</label>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <template x-for="option in playlistOptions" :key="`edit-playlist-${option}`">
+                            <button type="button"
+                                class="px-3 py-1 rounded-full border transition text-xs font-medium"
+                                :class="editDialog.form.playlists.includes(option) ? 'bg-primary-600 text-white border-primary-500' : 'border-slate-700 text-slate-300 hover:border-primary-600 hover:text-white'"
+                                x-on:click="toggleEditPlaylist(option)"
+                                x-text="option"></button>
+                        </template>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" class="rounded-lg border border-slate-700 px-4 py-2 text-slate-300 hover:bg-slate-800" x-on:click="closeEditDialog">Cancel</button>
+                    <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-white hover:bg-primary-500" x-bind:disabled="loading">Save changes</button>
+                </div>
+            </form>
+            <template x-if="editDialog.error">
+                <p class="text-sm text-red-400" x-text="editDialog.error"></p>
+            </template>
+        </div>
+    </div>
+    </div>
+
+    <script>
     function appState(stateJson) {
-        const initial = JSON.parse(stateJson)
-        const initialMedia = initial.media || []
-        const canUpload = Boolean(initial.canUpload)
-        const isAdmin = Boolean(initial.isAdmin)
+        const initial = typeof stateJson === 'string' ? JSON.parse(stateJson) : (stateJson || {})
+        const initialMedia = Array.isArray(initial.media) ? initial.media : []
+        const tagOptions = Array.isArray(initial.tagOptions) ? initial.tagOptions : []
+        const playlistOptions = Array.isArray(initial.playlistOptions) ? initial.playlistOptions : []
+        const initialFilters = initial.initialFilters || {}
+        const initialTypes = Array.isArray(initialFilters.types) ? initialFilters.types : []
+        const playlists = Array.isArray(initial.playlists) ? initial.playlists : []
 
-        return {
+            return {
             allMedia: initialMedia,
-            filteredMedia: initialMedia,
+            filteredMedia: [],
             query: '',
             sortOrder: 'newest',
             filters: { images: true, videos: true, audio: true },
-            canUpload,
-            isAdmin,
-            newMedia: { title: '', tags: '' },
-            loading: false,
-            status: '',
+            canUpload: Boolean(initial.canUpload),
+            isAdmin: Boolean(initial.isAdmin),
+            userRole: initial.role || 'viewer',
+            userId: initial.userId || null,
+            tagOptions,
+            playlistOptions,
+            selectedTags: Array.isArray(initialFilters.tags) ? initialFilters.tags : [],
+            selectedPlaylists: Array.isArray(initialFilters.playlists) ? initialFilters.playlists : [],
+            playlists,
+            newMedia: { title: '', tags: [], playlists: [] },
+                loading: false,
+                status: '',
             viewer: { open: false, item: null },
+            deleteDialog: { open: false, item: null },
+            editDialog: { open: false, item: null, form: { title: '', description: '', tags: [], playlists: [] }, error: '' },
+            playlistManager: {
+                open: false,
+                playlists,
+                form: { id: null, name: '', description: '' },
+                error: '',
+            },
             showVisualizer: false,
             audioContext: null,
             analyser: null,
@@ -188,30 +437,46 @@
             visualizerInitializing: false,
             visualizerHue: 0,
             init() {
+                if (initialTypes.length) {
+                    const normalized = initialTypes.map(type => String(type).toLowerCase())
+                    this.filters.images = normalized.some(type => type.startsWith('image'))
+                    this.filters.videos = normalized.some(type => type.startsWith('video'))
+                    this.filters.audio = normalized.some(type => type.startsWith('audio'))
+                }
                 this.applyFilters()
+            },
+            get canDelete() {
+                return this.userRole === 'uploader' || this.userRole === 'admin'
+            },
+            get canEdit() {
+                return this.userRole === 'uploader' || this.userRole === 'admin'
             },
             applyFilters() {
                 const q = this.query.toLowerCase()
                 this.filteredMedia = this.allMedia
                     .filter(item => {
-                        const matchesQuery = [item.filename, item.title, item.description, ...(item.tags || [])]
+                        const matchesQuery = [item.filename, item.title, item.description, ...(item.tags || []), ...(item.playlists || [])]
                             .filter(Boolean)
                             .some(value => value.toLowerCase().includes(q))
-                        const type = item.media_type
+                        const type = (item.media_type || '').toLowerCase()
                         const matchesType = (this.filters.images && type.startsWith('image/'))
                             || (this.filters.videos && type.startsWith('video/'))
                             || (this.filters.audio && type.startsWith('audio/'))
-                        return matchesQuery && matchesType
+                        const matchesTags = !this.selectedTags.length || (item.tags || []).some(tag => this.selectedTags.includes(tag))
+                        const matchesPlaylists = !this.selectedPlaylists.length || (item.playlists || []).some(pl => this.selectedPlaylists.includes(pl))
+                        return matchesQuery && matchesType && matchesTags && matchesPlaylists
                     })
                     .sort((a, b) => {
                         if (this.sortOrder === 'name') {
                             return a.filename.localeCompare(b.filename)
                         }
+                        const aTime = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0
+                        const bTime = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0
                         if (this.sortOrder === 'oldest') {
-                            return (a.uploaded_at || 0) - (b.uploaded_at || 0)
+                            return aTime - bTime
                         }
                         if (this.sortOrder === 'newest') {
-                            return (b.uploaded_at || 0) - (a.uploaded_at || 0)
+                            return bTime - aTime
                         }
                         return 0
                     })
@@ -223,52 +488,67 @@
                 this.teardownVisualizer()
                 this.viewer = { open: false, item: null }
             },
-            async upload() {
-                const fileInput = this.$refs.fileInput
-                if (!fileInput.files[0]) {
-                    this.status = 'Please select a file first.'
-                    return
+            openDeleteDialog(item) {
+                this.deleteDialog = { open: true, item }
+            },
+            closeDeleteDialog() {
+                this.deleteDialog = { open: false, item: null }
+            },
+            openEditDialog(item) {
+                this.editDialog = {
+                    open: true,
+                    item,
+                    form: {
+                        title: item.title || '',
+                        description: item.description || '',
+                        tags: [...(item.tags || [])],
+                        playlists: [...(item.playlists || [])]
+                    },
+                    error: ''
                 }
-                this.loading = true
-                this.status = ''
-                const formData = new FormData()
-                formData.append('file', fileInput.files[0])
-                if (this.newMedia.title) formData.append('title', this.newMedia.title)
-                if (this.newMedia.tags) formData.append('tags', this.newMedia.tags)
-                try {
-                    const response = await fetch('/upload', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    if (!response.ok) {
-                        throw new Error('Upload failed')
+            },
+            closeEditDialog() {
+                this.editDialog = { open: false, item: null, form: { title: '', description: '', tags: [], playlists: [] }, error: '' }
+            },
+                async upload() {
+                    const fileInput = this.$refs.fileInput
+                if (!fileInput?.files?.[0]) {
+                        this.status = 'Please select a file first.'
+                        return
                     }
-                    const data = await response.json()
+                    this.loading = true
+                    this.status = ''
+                    const formData = new FormData()
+                    formData.append('file', fileInput.files[0])
+                if (this.newMedia.title) formData.append('title', this.newMedia.title)
+                if (this.newMedia.tags.length) formData.append('tags', this.newMedia.tags.join(','))
+                if (this.newMedia.playlists.length) formData.append('playlists', this.newMedia.playlists.join(','))
+                    try {
+                        const response = await fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        if (!response.ok) {
+                            throw new Error('Upload failed')
+                        }
+                        const data = await response.json()
                     const item = data.media_item
                     item.uploaded_at = Date.now()
-                    if (this.newMedia.tags) {
-                        item.tags = this.newMedia.tags.split(',').map(t => t.trim()).filter(Boolean)
-                    }
-                    if (this.newMedia.title) {
-                        item.title = this.newMedia.title
-                    }
                     this.allMedia.unshift(item)
                     this.applyFilters()
                     this.newMedia.title = ''
-                    this.newMedia.tags = ''
-                    fileInput.value = null
-                    this.status = 'Upload successful!'
-                } catch (error) {
-                    console.error(error)
-                    this.status = 'Error uploading file.'
-                } finally {
-                    this.loading = false
+                    this.newMedia.tags = []
+                    this.newMedia.playlists = []
+                        fileInput.value = null
+                        this.status = 'Upload successful!'
+                    } catch (error) {
+                        console.error(error)
+                        this.status = 'Error uploading file.'
+                    } finally {
+                        this.loading = false
                 }
             },
             async deleteMedia(item) {
-                if (!confirm('Are you sure you want to delete this media item?')) {
-                    return
-                }
                 this.loading = true
                 this.status = ''
                 try {
@@ -278,7 +558,6 @@
                     if (!response.ok) {
                         throw new Error('Deletion failed')
                     }
-                    const data = await response.json()
                     this.allMedia = this.allMedia.filter(media => media.filename !== item.filename)
                     this.applyFilters()
                     this.status = 'Media item deleted.'
@@ -288,6 +567,189 @@
                 } finally {
                     this.loading = false
                 }
+            },
+            async confirmDelete() {
+                if (!this.deleteDialog.item) return
+                await this.deleteMedia(this.deleteDialog.item)
+                this.closeDeleteDialog()
+            },
+            async confirmEdit() {
+                if (!this.editDialog.item) return
+                this.loading = true
+                this.editDialog.error = ''
+                const form = new FormData()
+                form.append('title', this.editDialog.form.title || '')
+                form.append('description', this.editDialog.form.description || '')
+                form.append('tags', this.editDialog.form.tags.join(','))
+                form.append('playlists', this.editDialog.form.playlists.join(','))
+                try {
+                    const response = await fetch(`/media/${encodeURIComponent(this.editDialog.item.filename)}`, {
+                        method: 'PUT',
+                        body: form
+                    })
+                    if (!response.ok) {
+                        throw new Error('Update failed')
+                    }
+                    const data = await response.json()
+                    const item = data.media_item
+                    const index = this.allMedia.findIndex(media => media.filename === item.filename)
+                    if (index !== -1) {
+                        this.allMedia.splice(index, 1, item)
+                    }
+                    this.applyFilters()
+                    this.status = 'Media updated successfully.'
+                    this.closeEditDialog()
+                } catch (error) {
+                    console.error(error)
+                    this.editDialog.error = 'Error updating media item.'
+                } finally {
+                    this.loading = false
+                }
+            },
+            formatTimestamp(value) {
+                if (!value) return ''
+                try {
+                    return new Intl.DateTimeFormat(undefined, {
+                        year: 'numeric', month: 'short', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    }).format(new Date(value))
+                } catch (error) {
+                    return value
+                }
+            },
+            downloadMedia(item) {
+                const filename = item?.filename || 'download'
+                const href = item?.url || `/media/${encodeURIComponent(filename)}`
+                try {
+                    const link = document.createElement('a')
+                    link.href = href
+                    link.setAttribute('download', filename)
+                    link.rel = 'noopener'
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                } catch (error) {
+                    console.error('Download failed, opening in new tab', error)
+                    window.open(href, '_blank', 'noopener,noreferrer')
+                }
+            },
+            toggleNewMediaTag(tag) {
+                const index = this.newMedia.tags.indexOf(tag)
+                if (index > -1) {
+                    this.newMedia.tags.splice(index, 1)
+                } else {
+                    this.newMedia.tags.push(tag)
+                }
+            },
+            toggleNewMediaPlaylist(playlist) {
+                const index = this.newMedia.playlists.indexOf(playlist)
+                if (index > -1) {
+                    this.newMedia.playlists.splice(index, 1)
+                } else {
+                    this.newMedia.playlists.push(playlist)
+                }
+            },
+            toggleEditTag(tag) {
+                const index = this.editDialog.form.tags.indexOf(tag)
+                if (index > -1) {
+                    this.editDialog.form.tags.splice(index, 1)
+                } else {
+                    this.editDialog.form.tags.push(tag)
+                }
+            },
+            toggleEditPlaylist(playlist) {
+                const index = this.editDialog.form.playlists.indexOf(playlist)
+                if (index > -1) {
+                    this.editDialog.form.playlists.splice(index, 1)
+                } else {
+                    this.editDialog.form.playlists.push(playlist)
+                }
+            },
+            toggleTagFilter(option) {
+                const index = this.selectedTags.indexOf(option)
+                if (index > -1) {
+                    this.selectedTags.splice(index, 1)
+                } else {
+                    this.selectedTags.push(option)
+                }
+                this.applyFilters()
+            },
+            togglePlaylistFilter(option) {
+                const index = this.selectedPlaylists.indexOf(option)
+                if (index > -1) {
+                    this.selectedPlaylists.splice(index, 1)
+                } else {
+                    this.selectedPlaylists.push(option)
+                }
+                this.applyFilters()
+            },
+            openPlaylistManager(playlist = null) {
+                if (playlist) {
+                    this.playlistManager.form = { id: playlist.id, name: playlist.name, description: playlist.description || '' }
+                } else {
+                    this.playlistManager.form = { id: null, name: '', description: '' }
+                }
+                this.playlistManager.error = ''
+                this.playlistManager.open = true
+            },
+            closePlaylistManager() {
+                this.playlistManager.open = false
+            },
+            async savePlaylist() {
+                const form = this.playlistManager.form
+                if (!form.name.trim()) {
+                    this.playlistManager.error = 'Name is required.'
+                    return
+                }
+                this.loading = true
+                this.playlistManager.error = ''
+                try {
+                    const formData = new FormData()
+                    formData.append('name', form.name.trim())
+                    if (form.description) formData.append('description', form.description)
+                    const method = form.id ? 'PUT' : 'POST'
+                    const url = form.id ? `/playlists/${form.id}` : '/playlists'
+                    const response = await fetch(url, {
+                        method,
+                        body: formData
+                    })
+                    if (!response.ok) {
+                        throw new Error('Save failed')
+                    }
+                    const playlist = await response.json()
+                    const idx = this.playlistManager.playlists.findIndex(pl => pl.id === playlist.id)
+                    if (idx > -1) {
+                        this.playlistManager.playlists.splice(idx, 1, playlist)
+                    } else {
+                        this.playlistManager.playlists.push(playlist)
+                    }
+                    this.closePlaylistManager()
+                } catch (error) {
+                    console.error(error)
+                    this.playlistManager.error = 'Unable to save playlist.'
+                } finally {
+                    this.loading = false
+                }
+            },
+            async deletePlaylist(playlist) {
+                if (!confirm(`Delete playlist "${playlist.name}"?`)) return
+                this.loading = true
+                try {
+                    const response = await fetch(`/playlists/${playlist.id}`, { method: 'DELETE' })
+                    if (!response.ok) {
+                        throw new Error('Delete failed')
+                    }
+                    this.playlistManager.playlists = this.playlistManager.playlists.filter(pl => pl.id !== playlist.id)
+                } catch (error) {
+                    console.error(error)
+                    alert('Unable to delete playlist.')
+                } finally {
+                    this.loading = false
+                }
+            },
+            openPlaylist(playlist) {
+                fetch(`/library/music?playlist_id=${playlist.id}`)
+                window.location.href = `/library/music?playlist_id=${playlist.id}`
             },
             startVisualizer() {
                 if (!this.viewer.item || !this.viewer.item.media_type.startsWith('audio/')) return
@@ -479,8 +941,8 @@
                 }
 
                 this.rafId = requestAnimationFrame(() => this.drawVisualizer())
+                }
             }
         }
-    }
-</script>
+    </script>
 {% endblock %}

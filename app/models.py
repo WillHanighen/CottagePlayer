@@ -32,6 +32,19 @@ class User(SQLModel, table=True):
     media: list["Media"] = Relationship(back_populates="owner")
 
 
+class Playlist(SQLModel, table=True):
+    __tablename__ = "playlists"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True, nullable=False)
+    description: Optional[str] = None
+    owner_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+    owner: Optional[User] = Relationship()
+    items: list["PlaylistItem"] = Relationship(back_populates="playlist")
+
+
 class Media(SQLModel, table=True):
     __tablename__ = "media"
 
@@ -45,8 +58,21 @@ class Media(SQLModel, table=True):
     title: Optional[str] = None
     description: Optional[str] = None
     tags: list[str] = Field(default_factory=list, sa_column=Column(JSON, default=list))
+    playlists: list[str] = Field(default_factory=list, sa_column=Column(JSON, default=list))
     duration_seconds: Optional[float] = None
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 
     owner_id: Optional[int] = Field(default=None, foreign_key="users.id")
     owner: Optional[User] = Relationship(back_populates="media")
+    playlist_items: list["PlaylistItem"] = Relationship(back_populates="media")
+
+
+class PlaylistItem(SQLModel, table=True):
+    __tablename__ = "playlist_items"
+
+    playlist_id: int = Field(foreign_key="playlists.id", primary_key=True)
+    media_id: int = Field(foreign_key="media.id", primary_key=True)
+    position: int = Field(default=0)
+
+    playlist: Playlist = Relationship(back_populates="items")
+    media: Media = Relationship(back_populates="playlist_items")

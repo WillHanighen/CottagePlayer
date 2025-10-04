@@ -11,20 +11,24 @@ class MediaItem(BaseModel):
     title: str | None = None
     description: str | None = None
     tags: list[str] = Field(default_factory=list)
+    playlists: list[str] = Field(default_factory=list)
     original_filename: str | None = None
     uploaded_at: str | None = None
+    owner_id: int | None = None
 
 
 class MediaCreate(BaseModel):
     title: str | None = None
     description: str | None = None
     tags: list[str] = Field(default_factory=list)
+    playlists: list[str] = Field(default_factory=list)
 
 
 class MediaUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     tags: list[str] = Field(default_factory=list)
+    playlists: list[str] = Field(default_factory=list)
 
 
 class UserRead(BaseModel):

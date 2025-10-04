@@ -1,9 +1,10 @@
 from typing import Optional, Tuple
 
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from .database import get_session
-from .models import Media, MediaType, User, UserRole
+from .models import Media, MediaType, Playlist, PlaylistItem, User, UserRole
 
 
 def _normalize_email(email: str) -> str:
@@ -118,6 +119,96 @@ def list_media() -> list[Media]:
         return list(session.exec(select(Media)))
 
 
+def list_playlists() -> list[Playlist]:
+    with get_session() as session:
+        statement = select(Playlist).options(
+            selectinload(Playlist.items).selectinload(PlaylistItem.media)
+        )
+        return list(session.exec(statement))
+
+
+def get_playlist(playlist_id: int) -> Optional[Playlist]:
+    with get_session() as session:
+        statement = select(Playlist).options(
+            selectinload(Playlist.items).selectinload(PlaylistItem.media)
+        ).where(Playlist.id == playlist_id)
+        return session.exec(statement).first()
+
+
+def create_playlist(name: str, description: str | None, owner_id: int | None = None) -> Playlist:
+    with get_session() as session:
+        playlist = Playlist(name=name.strip(), description=description, owner_id=owner_id)
+        session.add(playlist)
+        session.flush()
+        session.refresh(playlist)
+        return playlist
+
+
+def update_playlist(playlist_id: int, *, name: str | None = None, description: str | None = None) -> Playlist:
+    with get_session() as session:
+        playlist = session.get(Playlist, playlist_id)
+        if not playlist:
+            raise ValueError("Playlist not found")
+        if name is not None:
+            playlist.name = name.strip()
+        if description is not None:
+            playlist.description = description
+        session.add(playlist)
+        session.flush()
+        session.refresh(playlist)
+        return playlist
+
+
+def delete_playlist(playlist_id: int) -> None:
+    with get_session() as session:
+        playlist = session.get(Playlist, playlist_id)
+        if not playlist:
+            raise ValueError("Playlist not found")
+        session.delete(playlist)
+
+
+def set_playlist_items(playlist_id: int, media_ids: list[int]) -> Playlist:
+    with get_session() as session:
+        playlist = session.get(Playlist, playlist_id)
+        if not playlist:
+            raise ValueError("Playlist not found")
+
+        session.exec(select(PlaylistItem).where(PlaylistItem.playlist_id == playlist_id)).delete()
+
+        for position, media_id in enumerate(media_ids):
+            session.add(PlaylistItem(playlist_id=playlist_id, media_id=media_id, position=position))
+
+        session.flush()
+        session.refresh(playlist)
+        return playlist
+
+
+def add_media_to_playlist(playlist_id: int, media_id: int, position: int | None = None) -> PlaylistItem:
+    with get_session() as session:
+        playlist = session.get(Playlist, playlist_id)
+        if not playlist:
+            raise ValueError("Playlist not found")
+        media = session.get(Media, media_id)
+        if not media:
+            raise ValueError("Media not found")
+        if position is None:
+            existing_count = session.exec(select(PlaylistItem).where(PlaylistItem.playlist_id == playlist_id)).count()
+            position = existing_count
+        item = PlaylistItem(playlist_id=playlist_id, media_id=media_id, position=position)
+        session.add(item)
+        session.flush()
+        session.refresh(item)
+        return item
+
+
+def remove_media_from_playlist(playlist_id: int, media_id: int) -> None:
+    with get_session() as session:
+        item = session.get(PlaylistItem, (playlist_id, media_id))
+        if not item:
+            raise ValueError("Playlist item not found")
+        session.delete(item)
+
+
 def create_media(
     filename: str,
     original_filename: str | None,
@@ -128,6 +219,7 @@ def create_media(
     title: str | None,
     description: str | None,
     tags: list[str],
+    playlists: list[str],
     owner_id: int | None = None,
 ) -> Media:
     with get_session() as session:
@@ -141,6 +233,7 @@ def create_media(
             title=title,
             description=description,
             tags=tags,
+            playlists=playlists,
             owner_id=owner_id,
         )
         session.add(media)
@@ -155,3 +248,34 @@ def delete_media(filename: str) -> None:
         if not media:
             raise ValueError("Media not found")
         session.delete(media)
+
+
+def get_media_by_filename(filename: str) -> Optional[Media]:
+    with get_session() as session:
+        return session.exec(select(Media).where(Media.filename == filename)).first()
+
+
+def update_media(
+    filename: str,
+    *,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+    playlists: Optional[list[str]] = None,
+) -> Media:
+    with get_session() as session:
+        media = session.exec(select(Media).where(Media.filename == filename)).first()
+        if not media:
+            raise ValueError("Media not found")
+        if title is not None:
+            media.title = title
+        if description is not None:
+            media.description = description
+        if tags is not None:
+            media.tags = tags
+        if playlists is not None:
+            media.playlists = playlists
+        session.add(media)
+        session.flush()
+        session.refresh(media)
+        return media

@@ -46,8 +46,21 @@
                 </div>
             </div>
             {% endif %}
+            {% set sidebar_links = [
+                {"href": "/", "label": "All Media", "category": None},
+                {"href": "/library/music", "label": "Music & Playlists", "category": "music"},
+                {"href": "/library/movies", "label": "Movies", "category": "movies"},
+                {"href": "/library/tv", "label": "TV Shows", "category": "tv"},
+                {"href": "/library/photos", "label": "Photos & GIFs", "category": "photos"}
+            ] %}
             <nav class="space-y-2">
-                <a href="/" class="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition">Library</a>
+                {% for link in sidebar_links %}
+                    {% set active = (category is defined and category == link.category) or (category is not defined and link.category is none) %}
+                    <a href="{{ link.href }}"
+                        class="block px-3 py-2 rounded-lg text-sm font-medium transition {{ 'bg-primary-600 text-white' if active else 'hover:bg-slate-800' }}">
+                        {{ link.label }}
+                    </a>
+                {% endfor %}
                 {% if user and user.role == 'admin' %}
                 <a href="/admin/users" class="block px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition">User Management</a>
                 {% endif %}

@@ -121,11 +121,11 @@ def generate_thumbnail(path: Path, mime_type: str) -> str | None:
 
 def delete_media_file(filename: str) -> None:
     settings = get_settings()
-    media_root = Path(settings.media_root)
+    media_root = Path(settings.media_root).resolve()
     target = (media_root / filename).resolve()
     if not target.exists() or not target.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found")
-    if media_root not in target.parents and target != media_root:
+    if media_root not in target.parents:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     try:
